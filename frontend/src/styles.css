@@ -1,0 +1,57 @@
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: #f7f4ee;
+  color: #1f2937;
+}
+
+.app-shell {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 20px 16px 40px;
+}
+
+header h1 {
+  margin-bottom: 4px;
+}
+
+.sub {
+  color: #6b7280;
+  margin-top: 0;
+}
+
+.card {
+  background: white;
+  border-radius: 18px;
+  padding: 18px;
+  margin-top: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+}
+
+.primary {
+  background: linear-gradient(180deg, #fff7ed, #ffffff);
+}
+
+button {
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  background: #111827;
+  color: white;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.sprints {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.sprints button {
+  background: #e5e7eb;
+  color: #111827;
+}
