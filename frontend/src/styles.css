@@ -5,6 +5,10 @@ body {
   color: #1f2937;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 .app-shell {
   max-width: 420px;
   margin: 0 auto;
@@ -16,9 +20,14 @@ header h1 {
   margin-bottom: 4px;
 }
 
-.sub {
+.sub, .muted {
   color: #6b7280;
   margin-top: 0;
+}
+
+.focus {
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .card {
@@ -33,6 +42,13 @@ header h1 {
   background: linear-gradient(180deg, #fff7ed, #ffffff);
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 button {
   border: 0;
   border-radius: 14px;
@@ -45,6 +61,22 @@ button {
   margin-top: 12px;
 }
 
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #d1d5db;
+  margin-top: 10px;
+  background: #fff;
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
 .sprints {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -54,4 +86,30 @@ button {
 .sprints button {
   background: #e5e7eb;
   color: #111827;
+}
+
+.task-list {
+  padding-left: 18px;
+  margin: 12px 0 0;
+}
+
+.stack {
+  display: grid;
+}
+
+.result {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.pill {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #111827;
+  color: white;
+  font-size: 0.9rem;
 }

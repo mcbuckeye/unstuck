@@ -1,0 +1,26 @@
+services:
+  unstuck-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8060:8000"
+    networks:
+      - dokploy-network
+
+  unstuck-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    ports:
+      - "3060:3000"
+    depends_on:
+      - unstuck-backend
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true

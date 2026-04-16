@@ -7,6 +7,30 @@ Mobile-first focus coaching web app for reducing procrastination and helping use
 - `PRD.md` — product requirements
 - `BEHAVIOR_SYSTEM.md` — psychological model and intervention flows
 
-## Vision
+## Development
 
-Unstuck is not just a task manager. It is an execution support system that helps users move from avoidance to action with short guided interventions, tiny next steps, and focus sprints.
+### Backend
+```bash
+PYTHONPATH=. uvicorn backend.main:app --reload
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Tests
+```bash
+PYTHONPATH=. pytest tests/test_api.py
+```
+
+## Deployment
+
+The repo includes:
+- `Dockerfile`
+- `Dockerfile.frontend`
+- `docker-compose.yml`
+
+Designed for deployment via GitHub + Dokploy.
