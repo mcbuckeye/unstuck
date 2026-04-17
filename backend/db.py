@@ -1,11 +1,16 @@
 import os
+from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./unstuck.db')
 engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False} if DATABASE_URL.startswith('sqlite') else {})
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class Base(DeclarativeBase):
@@ -18,6 +23,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class Task(Base):
@@ -28,6 +34,7 @@ class Task(Base):
     title: Mapped[str] = mapped_column(String)
     category: Mapped[str | None] = mapped_column(String, nullable=True)
     done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class Sprint(Base):
@@ -38,6 +45,7 @@ class Sprint(Base):
     minutes: Mapped[int] = mapped_column(Integer)
     task_title: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default='active')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class Intervention(Base):
@@ -49,6 +57,7 @@ class Intervention(Base):
     blocker: Mapped[str] = mapped_column(String)
     feeling: Mapped[str] = mapped_column(String)
     next_step: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class Checkin(Base):
@@ -60,6 +69,7 @@ class Checkin(Base):
     mood: Mapped[str] = mapped_column(String)
     clarity: Mapped[str] = mapped_column(String)
     resistance: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 def init_db():

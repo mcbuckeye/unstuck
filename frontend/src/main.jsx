@@ -5,30 +5,78 @@ import './styles.css'
 
 const API = '/api'
 
+function authHeaders(token) {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  }
+}
+
+async function apiFetch(path, { token, method = 'GET', body } = {}) {
+  const opts = { method, headers: authHeaders(token) }
+  if (body) opts.body = JSON.stringify(body)
+  const res = await fetch(`${API}${path}`, opts)
+  if (res.status === 401) {
+    localStorage.removeItem('unstuck_token')
+    localStorage.removeItem('unstuck_user')
+    window.location.reload()
+    return null
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Request failed' }))
+    throw new Error(err.detail || 'Request failed')
+  }
+  return res.json()
+}
+
 function AuthGate({ onReady }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState('signup')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
     setError('')
-    const endpoint = mode === 'signup' ? '/auth/signup' : '/auth/login'
-    const res = await fetch(`${API}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.detail || 'Something went wrong')
-      return
-    }
-    if (mode === 'signup') {
-      onReady({ id: data.id, email })
-    } else {
-      onReady({ id: data.user_id, email })
+    setLoading(true)
+    try {
+      const endpoint = mode === 'signup' ? '/auth/signup' : '/auth/login'
+      const res = await fetch(`${API}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.detail || 'Something went wrong')
+        return
+      }
+      if (mode === 'signup') {
+        const loginRes = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const loginData = await loginRes.json()
+        if (!loginRes.ok) {
+          setError(loginData.detail || 'Login after signup failed')
+          return
+        }
+        const user = { id: loginData.user_id, email, token: loginData.token }
+        localStorage.setItem('unstuck_token', loginData.token)
+        localStorage.setItem('unstuck_user', JSON.stringify({ id: loginData.user_id, email }))
+        onReady(user)
+      } else {
+        const user = { id: data.user_id, email, token: data.token }
+        localStorage.setItem('unstuck_token', data.token)
+        localStorage.setItem('unstuck_user', JSON.stringify({ id: data.user_id, email }))
+        onReady(user)
+      }
+    } catch {
+      setError('Network error')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -36,12 +84,14 @@ function AuthGate({ onReady }) {
     <Card>
       <SectionTitle>{mode === 'signup' ? 'Create your account' : 'Log in'}</SectionTitle>
       <form onSubmit={submit} className="stack">
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
-        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" required />
+        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" minLength={6} required />
         {error ? <p className="error">{error}</p> : null}
-        <button type="submit">{mode === 'signup' ? 'Sign up' : 'Log in'}</button>
+        <button type="submit" disabled={loading}>
+          {loading ? 'Working...' : mode === 'signup' ? 'Sign up' : 'Log in'}
+        </button>
       </form>
-      <button className="ghost" onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}>
+      <button className="ghost" onClick={() => { setMode(mode === 'signup' ? 'login' : 'signup'); setError('') }}>
         Switch to {mode === 'signup' ? 'log in' : 'sign up'}
       </button>
     </Card>
@@ -49,17 +99,41 @@ function AuthGate({ onReady }) {
 }
 
 function App() {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(() => {
+    const token = localStorage.getItem('unstuck_token')
+    const stored = localStorage.getItem('unstuck_user')
+    if (token && stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        return { ...parsed, token }
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
   const [today, setToday] = useState({ tasks: [], wins: [], interventions: [] })
   const [taskTitle, setTaskTitle] = useState('')
   const [stuckForm, setStuckForm] = useState({ avoiding: '', blocker: 'overwhelm', feeling: 'anxious' })
   const [checkinForm, setCheckinForm] = useState({ energy: 'medium', mood: 'steady', clarity: 'clear', resistance: 'medium' })
   const [unstuckResult, setUnstuckResult] = useState(null)
+  const [error, setError] = useState('')
+
+  function logout() {
+    localStorage.removeItem('unstuck_token')
+    localStorage.removeItem('unstuck_user')
+    setUser(null)
+    setToday({ tasks: [], wins: [], interventions: [] })
+  }
 
   async function loadToday(activeUser = user) {
     if (!activeUser) return
-    const res = await fetch(`${API}/today?user_id=${activeUser.id}`)
-    setToday(await res.json())
+    try {
+      const data = await apiFetch('/today', { token: activeUser.token })
+      if (data) setToday(data)
+    } catch {
+      setError('Failed to load data')
+    }
   }
 
   useEffect(() => {
@@ -69,63 +143,62 @@ function App() {
   async function createTask(e) {
     e.preventDefault()
     if (!taskTitle.trim()) return
-    await fetch(`${API}/tasks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, title: taskTitle, category: 'focus' }),
-    })
-    setTaskTitle('')
-    loadToday()
+    try {
+      await apiFetch('/tasks', { token: user.token, method: 'POST', body: { title: taskTitle, category: 'focus' } })
+      setTaskTitle('')
+      loadToday()
+    } catch {
+      setError('Failed to create task')
+    }
   }
 
   async function completeTask(taskId) {
-    await fetch(`${API}/tasks/${taskId}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id }),
-    })
-    loadToday()
+    try {
+      await apiFetch(`/tasks/${taskId}/complete`, { token: user.token, method: 'POST' })
+      loadToday()
+    } catch {
+      setError('Failed to complete task')
+    }
   }
 
   async function submitUnstuck(e) {
     e.preventDefault()
-    const res = await fetch(`${API}/unstuck`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...stuckForm, user_id: user.id }),
-    })
-    const data = await res.json()
-    setUnstuckResult(data)
-    loadToday()
+    try {
+      const data = await apiFetch('/unstuck', { token: user.token, method: 'POST', body: stuckForm })
+      setUnstuckResult(data)
+      loadToday()
+    } catch {
+      setError('Failed to process')
+    }
   }
 
   async function startSprint(minutes) {
-    await fetch(`${API}/sprints`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id, minutes, task_title: today.main_focus }),
-    })
-    loadToday()
+    try {
+      await apiFetch('/sprints', { token: user.token, method: 'POST', body: { minutes, task_title: today.main_focus } })
+      loadToday()
+    } catch {
+      setError('Failed to start sprint')
+    }
   }
 
   async function completeSprint() {
     if (!today.active_sprint) return
-    await fetch(`${API}/sprints/${today.active_sprint.id}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: user.id }),
-    })
-    loadToday()
+    try {
+      await apiFetch(`/sprints/${today.active_sprint.id}/complete`, { token: user.token, method: 'POST' })
+      loadToday()
+    } catch {
+      setError('Failed to complete sprint')
+    }
   }
 
   async function submitCheckin(e) {
     e.preventDefault()
-    await fetch(`${API}/checkins`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...checkinForm, user_id: user.id }),
-    })
-    loadToday()
+    try {
+      await apiFetch('/checkins', { token: user.token, method: 'POST', body: checkinForm })
+      loadToday()
+    } catch {
+      setError('Failed to save check-in')
+    }
   }
 
   const stats = useMemo(() => ({
@@ -149,8 +222,18 @@ function App() {
     <main className="app-shell">
       <header>
         <h1>Unstuck</h1>
-        <p className="sub">Welcome back, {user.email}</p>
+        <div className="header-row">
+          <p className="sub">Welcome back, {user.email}</p>
+          <button className="ghost small" onClick={logout}>Log out</button>
+        </div>
       </header>
+
+      {error && (
+        <Card className="error-card">
+          <p className="error">{error}</p>
+          <button className="ghost small" onClick={() => setError('')}>Dismiss</button>
+        </Card>
+      )}
 
       <Card className="primary">
         <SectionTitle>Today</SectionTitle>
@@ -210,12 +293,13 @@ function App() {
       </Card>
 
       <Card>
-        <SectionTitle>I’m stuck</SectionTitle>
+        <SectionTitle>I'm stuck</SectionTitle>
         <form onSubmit={submitUnstuck} className="stack">
           <textarea
             value={stuckForm.avoiding}
             onChange={(e) => setStuckForm({ ...stuckForm, avoiding: e.target.value })}
             placeholder="What are you avoiding?"
+            required
           />
           <select value={stuckForm.blocker} onChange={(e) => setStuckForm({ ...stuckForm, blocker: e.target.value })}>
             <option value="overwhelm">Too big</option>
