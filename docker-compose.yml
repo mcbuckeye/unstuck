@@ -6,6 +6,10 @@ services:
     restart: unless-stopped
     ports:
       - "8060:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./unstuck.db}
+      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET before starting}
+      - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-1440}
     networks:
       - dokploy-network
 

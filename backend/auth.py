@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -8,9 +9,14 @@ from passlib.context import CryptContext
 
 from backend.db import User, get_session
 
+logger = logging.getLogger(__name__)
+
 SECRET_KEY = os.getenv('JWT_SECRET', 'dev-secret-change-in-production')
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('JWT_EXPIRE_MINUTES', '1440'))  # 24h default
+
+if SECRET_KEY == 'dev-secret-change-in-production':
+    logger.warning('JWT_SECRET is using the default dev value — set JWT_SECRET env var before deploying to production')
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 bearer_scheme = HTTPBearer()

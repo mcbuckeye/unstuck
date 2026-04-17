@@ -1,9 +1,12 @@
 import os
+import time
 
 from fastapi.testclient import TestClient
+from jose import jwt
 
 os.environ['DATABASE_URL'] = 'sqlite:///./unstuck_test.db'
 
+from backend.auth import ALGORITHM, SECRET_KEY  # noqa: E402
 from backend.main import app, reset_state  # noqa: E402
 
 client = TestClient(app)
@@ -298,3 +301,104 @@ def test_multiple_checkins_latest_wins():
     today = client.get('/api/today', headers=auth_header(token)).json()
     assert today['energy'] == 'high'
     assert today['latest_checkin']['mood'] == 'hopeful'
+
+
+# -- end-to-end user journey --
+
+def test_full_user_journey():
+    """Complete happy-path: signup → checkin → add tasks → get stuck → sprint → complete → verify dashboard."""
+    # 1. Sign up and log in
+    signup = client.post('/api/auth/signup', json={'email': 'journey@example.com', 'password': 'pass1234'})
+    assert signup.status_code == 201
+    login = client.post('/api/auth/login', json={'email': 'journey@example.com', 'password': 'pass1234'})
+    assert login.status_code == 200
+    token = login.json()['token']
+    headers = auth_header(token)
+
+    # 2. Daily check-in
+    checkin = client.post('/api/checkins', json={'energy': 'low', 'mood': 'anxious', 'clarity': 'foggy', 'resistance': 'high'}, headers=headers)
+    assert checkin.status_code == 201
+
+    # 3. Add two tasks
+    t1 = client.post('/api/tasks', json={'title': 'Write landing page', 'category': 'build'}, headers=headers)
+    assert t1.status_code == 201
+    t2 = client.post('/api/tasks', json={'title': 'Set up analytics', 'category': 'ops'}, headers=headers)
+    assert t2.status_code == 201
+
+    # 4. Get stuck on first task, use intervention
+    unstuck = client.post('/api/unstuck', json={'avoiding': 'Write landing page', 'blocker': 'overwhelm', 'feeling': 'anxious'}, headers=headers)
+    assert unstuck.status_code == 200
+    assert unstuck.json()['suggested_sprint_minutes'] == 5
+
+    # 5. Start and complete a sprint
+    sprint = client.post('/api/sprints', json={'minutes': 5, 'task_title': 'Write landing page'}, headers=headers)
+    assert sprint.status_code == 201
+    sprint_id = sprint.json()['id']
+    done_sprint = client.post(f'/api/sprints/{sprint_id}/complete', headers=headers)
+    assert done_sprint.status_code == 200
+    assert done_sprint.json()['status'] == 'completed'
+
+    # 6. Complete first task
+    task_id = t1.json()['id']
+    client.post(f'/api/tasks/{task_id}/complete', headers=headers)
+
+    # 7. Verify dashboard state
+    today = client.get('/api/today', headers=headers).json()
+    assert today['energy'] == 'low'
+    assert 'Write landing page' in today['wins']
+    assert len(today['interventions']) == 1
+    assert today['active_sprint'] is None  # sprint is completed
+    assert any(t['title'] == 'Set up analytics' for t in today['tasks'])
+    assert all(t['title'] != 'Write landing page' for t in today['tasks'])
+
+
+def test_multi_user_isolation():
+    """Two users should never see each other's data."""
+    token_a, _ = signup_and_login('alice@example.com', 'pass1234')
+    token_b, _ = signup_and_login('bob@example.com', 'pass1234')
+
+    client.post('/api/tasks', json={'title': 'Alice task'}, headers=auth_header(token_a))
+    client.post('/api/tasks', json={'title': 'Bob task'}, headers=auth_header(token_b))
+    client.post('/api/unstuck', json={'avoiding': 'Alice stuck', 'blocker': 'fear', 'feeling': 'anxious'}, headers=auth_header(token_a))
+    client.post('/api/checkins', json={'energy': 'high', 'mood': 'hopeful', 'clarity': 'clear', 'resistance': 'low'}, headers=auth_header(token_b))
+
+    today_a = client.get('/api/today', headers=auth_header(token_a)).json()
+    today_b = client.get('/api/today', headers=auth_header(token_b)).json()
+
+    assert any(t['title'] == 'Alice task' for t in today_a['tasks'])
+    assert all(t['title'] != 'Bob task' for t in today_a['tasks'])
+    assert any(t['title'] == 'Bob task' for t in today_b['tasks'])
+    assert all(t['title'] != 'Alice task' for t in today_b['tasks'])
+    assert len(today_a['interventions']) == 1
+    assert len(today_b['interventions']) == 0
+    assert today_a['energy'] == 'unknown'
+    assert today_b['energy'] == 'high'
+
+
+# -- auth: expired and tampered tokens --
+
+def test_expired_token_returns_401():
+    """An expired JWT should be rejected."""
+    expired_payload = {'sub': '999', 'email': 'x@example.com', 'exp': time.time() - 60}
+    expired_token = jwt.encode(expired_payload, SECRET_KEY, algorithm=ALGORITHM)
+    resp = client.get('/api/today', headers={'Authorization': f'Bearer {expired_token}'})
+    assert resp.status_code == 401
+
+
+def test_token_with_wrong_secret_returns_401():
+    """A JWT signed with a different secret should be rejected."""
+    bad_token = jwt.encode({'sub': '1', 'email': 'x@example.com', 'exp': time.time() + 3600}, 'wrong-secret', algorithm=ALGORITHM)
+    resp = client.get('/api/today', headers={'Authorization': f'Bearer {bad_token}'})
+    assert resp.status_code == 401
+
+
+# -- migration consistency --
+
+def test_alembic_models_match_migration():
+    """Verify all ORM tables are present in the database after init_db."""
+    from backend.db import Base, engine
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    db_tables = set(inspector.get_table_names())
+    model_tables = set(Base.metadata.tables.keys())
+    assert model_tables.issubset(db_tables), f'Missing tables: {model_tables - db_tables}'

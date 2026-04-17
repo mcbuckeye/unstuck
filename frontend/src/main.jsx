@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { Card, SectionTitle, StatsGrid } from './components'
 import './styles.css'
@@ -118,6 +118,13 @@ function App() {
   const [checkinForm, setCheckinForm] = useState({ energy: 'medium', mood: 'steady', clarity: 'clear', resistance: 'medium' })
   const [unstuckResult, setUnstuckResult] = useState(null)
   const [error, setError] = useState('')
+  const errorTimer = useRef(null)
+
+  const showError = useCallback((msg) => {
+    setError(msg)
+    clearTimeout(errorTimer.current)
+    errorTimer.current = setTimeout(() => setError(''), 5000)
+  }, [])
 
   function logout() {
     localStorage.removeItem('unstuckinator_token')
@@ -132,7 +139,7 @@ function App() {
       const data = await apiFetch('/today', { token: activeUser.token })
       if (data) setToday(data)
     } catch {
-      setError('Failed to load data')
+      showError('Failed to load data')
     }
   }
 
@@ -148,7 +155,7 @@ function App() {
       setTaskTitle('')
       loadToday()
     } catch {
-      setError('Failed to create task')
+      showError('Failed to create task')
     }
   }
 
@@ -157,7 +164,7 @@ function App() {
       await apiFetch(`/tasks/${taskId}/complete`, { token: user.token, method: 'POST' })
       loadToday()
     } catch {
-      setError('Failed to complete task')
+      showError('Failed to complete task')
     }
   }
 
@@ -168,7 +175,7 @@ function App() {
       setUnstuckResult(data)
       loadToday()
     } catch {
-      setError('Failed to process')
+      showError('Failed to process')
     }
   }
 
@@ -177,7 +184,7 @@ function App() {
       await apiFetch('/sprints', { token: user.token, method: 'POST', body: { minutes, task_title: today.main_focus } })
       loadToday()
     } catch {
-      setError('Failed to start sprint')
+      showError('Failed to start sprint')
     }
   }
 
@@ -187,7 +194,7 @@ function App() {
       await apiFetch(`/sprints/${today.active_sprint.id}/complete`, { token: user.token, method: 'POST' })
       loadToday()
     } catch {
-      setError('Failed to complete sprint')
+      showError('Failed to complete sprint')
     }
   }
 
@@ -197,7 +204,7 @@ function App() {
       await apiFetch('/checkins', { token: user.token, method: 'POST', body: checkinForm })
       loadToday()
     } catch {
-      setError('Failed to save check-in')
+      showError('Failed to save check-in')
     }
   }
 
@@ -282,14 +289,18 @@ function App() {
           <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="What needs to move today?" />
           <button type="submit">Add task</button>
         </form>
-        <ul className="task-list">
-          {today.tasks.map((task) => (
-            <li key={task.id} className="task-row">
-              <span>{task.title}</span>
-              <button className="small" onClick={() => completeTask(task.id)}>Done</button>
-            </li>
-          ))}
-        </ul>
+        {today.tasks.length === 0 ? (
+          <p className="muted">No open tasks yet. Add one above to get started.</p>
+        ) : (
+          <ul className="task-list">
+            {today.tasks.map((task) => (
+              <li key={task.id} className="task-row">
+                <span>{task.title}</span>
+                <button className="small" onClick={() => completeTask(task.id)}>Done</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card>
@@ -330,11 +341,15 @@ function App() {
 
       <Card>
         <SectionTitle>Recent interventions</SectionTitle>
-        <ul className="task-list">
-          {today.interventions.map((item) => (
-            <li key={item.id}>{item.avoiding} → {item.next_step}</li>
-          ))}
-        </ul>
+        {today.interventions.length === 0 ? (
+          <p className="muted">No interventions yet. Use "I'm stuck" when you feel blocked.</p>
+        ) : (
+          <ul className="task-list">
+            {today.interventions.map((item) => (
+              <li key={item.id}>{item.avoiding} → {item.next_step}</li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <Card>
