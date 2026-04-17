@@ -36,9 +36,9 @@ def test_today_screen_payload_is_user_scoped():
     assert payload['energy'] == 'unknown'
 
 
-def test_create_task():
+def test_create_and_complete_task():
     client.post('/api/auth/signup', json={'email': 'steve@example.com', 'password': 'secret123'})
-    response = client.post(
+    created = client.post(
         '/api/tasks',
         json={
             'user_id': 1,
@@ -46,19 +46,27 @@ def test_create_task():
             'category': 'build',
         },
     )
-    assert response.status_code == 201
-    payload = response.json()
+    assert created.status_code == 201
+    payload = created.json()
     assert payload['title'] == 'Draft welcome screen'
     assert payload['done'] is False
 
+    completed = client.post('/api/tasks/1/complete', json={'user_id': 1})
+    assert completed.status_code == 200
+    assert completed.json()['done'] is True
 
-def test_start_sprint():
+
+def test_start_and_complete_sprint():
     client.post('/api/auth/signup', json={'email': 'steve@example.com', 'password': 'secret123'})
     response = client.post('/api/sprints', json={'user_id': 1, 'minutes': 10, 'task_title': 'Draft welcome screen'})
     assert response.status_code == 201
     payload = response.json()
     assert payload['minutes'] == 10
     assert payload['status'] == 'active'
+
+    completed = client.post('/api/sprints/1/complete', json={'user_id': 1})
+    assert completed.status_code == 200
+    assert completed.json()['status'] == 'completed'
 
 
 def test_unstuck_flow_returns_small_next_step_and_persists_record():
@@ -79,3 +87,22 @@ def test_unstuck_flow_returns_small_next_step_and_persists_record():
 
     today = client.get('/api/today?user_id=1').json()
     assert len(today['interventions']) == 1
+
+
+def test_daily_checkin_persists():
+    client.post('/api/auth/signup', json={'email': 'steve@example.com', 'password': 'secret123'})
+    response = client.post(
+        '/api/checkins',
+        json={
+            'user_id': 1,
+            'energy': 'low',
+            'mood': 'anxious',
+            'clarity': 'foggy',
+            'resistance': 'high',
+        },
+    )
+    assert response.status_code == 201
+
+    today = client.get('/api/today?user_id=1').json()
+    assert today['energy'] == 'low'
+    assert today['latest_checkin']['mood'] == 'anxious'

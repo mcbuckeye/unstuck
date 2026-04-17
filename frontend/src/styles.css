@@ -61,10 +61,18 @@ button {
   margin-top: 12px;
 }
 
-button.ghost {
+button.ghost,
+button.small {
   background: transparent;
   color: #111827;
   border: 1px solid #d1d5db;
+}
+
+button.small {
+  width: auto;
+  margin-top: 0;
+  padding: 8px 12px;
+  font-size: 14px;
 }
 
 input,
@@ -99,8 +107,20 @@ textarea {
   margin: 12px 0 0;
 }
 
+.task-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 .stack {
   display: grid;
+}
+
+.stack.compact select {
+  margin-top: 8px;
 }
 
 .result {
@@ -118,4 +138,14 @@ textarea {
   background: #111827;
   color: white;
   font-size: 0.9rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.stats-grid strong {
+  font-size: 1.4rem;
 }

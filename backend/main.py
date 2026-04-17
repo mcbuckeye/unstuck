@@ -7,6 +7,7 @@ USERS = []
 TASKS = []
 SPRINTS = []
 INTERVENTIONS = []
+CHECKINS = []
 
 
 def reset_state():
@@ -14,6 +15,7 @@ def reset_state():
     TASKS.clear()
     SPRINTS.clear()
     INTERVENTIONS.clear()
+    CHECKINS.clear()
 
 
 class SignupRequest(BaseModel):
@@ -32,6 +34,10 @@ class TaskCreate(BaseModel):
     category: str | None = None
 
 
+class UserRef(BaseModel):
+    user_id: int
+
+
 class SprintCreate(BaseModel):
     user_id: int
     minutes: int
@@ -43,6 +49,14 @@ class UnstuckRequest(BaseModel):
     avoiding: str
     blocker: str
     feeling: str
+
+
+class CheckinCreate(BaseModel):
+    user_id: int
+    energy: str
+    mood: str
+    clarity: str
+    resistance: str
 
 
 @app.get('/api/health')
@@ -77,13 +91,15 @@ def today(user_id: int = Query(...)):
     open_tasks = [task for task in TASKS if task['user_id'] == user_id and not task['done']]
     interventions = [item for item in INTERVENTIONS if item['user_id'] == user_id]
     active_sprint = next((s for s in reversed(SPRINTS) if s['user_id'] == user_id and s['status'] == 'active'), None)
+    latest_checkin = next((c for c in reversed(CHECKINS) if c['user_id'] == user_id), None)
     return {
         'main_focus': open_tasks[0]['title'] if open_tasks else 'Start the most avoided meaningful task',
         'tasks': open_tasks,
-        'energy': 'unknown',
-        'wins': [],
+        'energy': latest_checkin['energy'] if latest_checkin else 'unknown',
+        'wins': [task['title'] for task in TASKS if task['user_id'] == user_id and task['done']],
         'active_sprint': active_sprint,
         'interventions': interventions,
+        'latest_checkin': latest_checkin,
     }
 
 
@@ -100,6 +116,15 @@ def create_task(task: TaskCreate):
     return payload
 
 
+@app.post('/api/tasks/{task_id}/complete')
+def complete_task(task_id: int, request: UserRef):
+    task = next((task for task in TASKS if task['id'] == task_id and task['user_id'] == request.user_id), None)
+    if not task:
+        raise HTTPException(status_code=404, detail='Task not found')
+    task['done'] = True
+    return task
+
+
 @app.post('/api/sprints', status_code=status.HTTP_201_CREATED)
 def create_sprint(sprint: SprintCreate):
     payload = {
@@ -110,6 +135,29 @@ def create_sprint(sprint: SprintCreate):
         'status': 'active',
     }
     SPRINTS.append(payload)
+    return payload
+
+
+@app.post('/api/sprints/{sprint_id}/complete')
+def complete_sprint(sprint_id: int, request: UserRef):
+    sprint = next((s for s in SPRINTS if s['id'] == sprint_id and s['user_id'] == request.user_id), None)
+    if not sprint:
+        raise HTTPException(status_code=404, detail='Sprint not found')
+    sprint['status'] = 'completed'
+    return sprint
+
+
+@app.post('/api/checkins', status_code=status.HTTP_201_CREATED)
+def create_checkin(checkin: CheckinCreate):
+    payload = {
+        'id': len(CHECKINS) + 1,
+        'user_id': checkin.user_id,
+        'energy': checkin.energy,
+        'mood': checkin.mood,
+        'clarity': checkin.clarity,
+        'resistance': checkin.resistance,
+    }
+    CHECKINS.append(payload)
     return payload
 
 

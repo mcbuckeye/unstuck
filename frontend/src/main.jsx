@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './styles.css'
 
@@ -45,6 +45,7 @@ function App() {
   const [today, setToday] = useState({ tasks: [], wins: [], interventions: [] })
   const [taskTitle, setTaskTitle] = useState('')
   const [stuckForm, setStuckForm] = useState({ avoiding: '', blocker: 'overwhelm', feeling: 'anxious' })
+  const [checkinForm, setCheckinForm] = useState({ energy: 'medium', mood: 'steady', clarity: 'clear', resistance: 'medium' })
   const [unstuckResult, setUnstuckResult] = useState(null)
 
   async function loadToday(activeUser = user) {
@@ -69,6 +70,15 @@ function App() {
     loadToday()
   }
 
+  async function completeTask(taskId) {
+    await fetch(`${API}/tasks/${taskId}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id }),
+    })
+    loadToday()
+  }
+
   async function submitUnstuck(e) {
     e.preventDefault()
     const res = await fetch(`${API}/unstuck`, {
@@ -89,6 +99,31 @@ function App() {
     })
     loadToday()
   }
+
+  async function completeSprint() {
+    if (!today.active_sprint) return
+    await fetch(`${API}/sprints/${today.active_sprint.id}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id }),
+    })
+    loadToday()
+  }
+
+  async function submitCheckin(e) {
+    e.preventDefault()
+    await fetch(`${API}/checkins`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...checkinForm, user_id: user.id }),
+    })
+    loadToday()
+  }
+
+  const stats = useMemo(() => ({
+    tasksDone: today.wins?.length || 0,
+    interventions: today.interventions?.length || 0,
+  }), [today])
 
   if (!user) {
     return (
@@ -113,7 +148,50 @@ function App() {
         <h2>Today</h2>
         <p className="muted">Main focus</p>
         <p className="focus">{today.main_focus}</p>
-        {today.active_sprint && <p className="pill">Active sprint: {today.active_sprint.minutes} min</p>}
+        {today.active_sprint && (
+          <>
+            <p className="pill">Active sprint: {today.active_sprint.minutes} min</p>
+            <button onClick={completeSprint}>Complete sprint</button>
+          </>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Daily check-in</h2>
+        <form onSubmit={submitCheckin} className="stack compact">
+          <select value={checkinForm.energy} onChange={(e) => setCheckinForm({ ...checkinForm, energy: e.target.value })}>
+            <option value="low">Low energy</option>
+            <option value="medium">Medium energy</option>
+            <option value="high">High energy</option>
+          </select>
+          <select value={checkinForm.mood} onChange={(e) => setCheckinForm({ ...checkinForm, mood: e.target.value })}>
+            <option value="steady">Steady</option>
+            <option value="anxious">Anxious</option>
+            <option value="frustrated">Frustrated</option>
+            <option value="hopeful">Hopeful</option>
+          </select>
+          <select value={checkinForm.clarity} onChange={(e) => setCheckinForm({ ...checkinForm, clarity: e.target.value })}>
+            <option value="clear">Clear</option>
+            <option value="foggy">Foggy</option>
+          </select>
+          <select value={checkinForm.resistance} onChange={(e) => setCheckinForm({ ...checkinForm, resistance: e.target.value })}>
+            <option value="low">Low resistance</option>
+            <option value="medium">Medium resistance</option>
+            <option value="high">High resistance</option>
+          </select>
+          <button type="submit">Save check-in</button>
+        </form>
+      </section>
+
+      <section className="card stats-grid">
+        <div>
+          <p className="muted">Completed tasks</p>
+          <strong>{stats.tasksDone}</strong>
+        </div>
+        <div>
+          <p className="muted">Recovered stuck moments</p>
+          <strong>{stats.interventions}</strong>
+        </div>
       </section>
 
       <section className="card">
@@ -124,7 +202,10 @@ function App() {
         </form>
         <ul className="task-list">
           {today.tasks.map((task) => (
-            <li key={task.id}>{task.title}</li>
+            <li key={task.id} className="task-row">
+              <span>{task.title}</span>
+              <button className="small" onClick={() => completeTask(task.id)}>Done</button>
+            </li>
           ))}
         </ul>
       </section>
