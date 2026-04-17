@@ -133,7 +133,7 @@ function App() {
     setToday({ tasks: [], wins: [], interventions: [] })
   }
 
-  async function loadToday(activeUser = user) {
+  const loadToday = useCallback(async (activeUser = user) => {
     if (!activeUser) return
     try {
       const data = await apiFetch('/today', { token: activeUser.token })
@@ -141,11 +141,11 @@ function App() {
     } catch {
       showError('Failed to load data')
     }
-  }
+  }, [user, showError])
 
   useEffect(() => {
     loadToday()
-  }, [user])
+  }, [loadToday])
 
   async function createTask(e) {
     e.preventDefault()

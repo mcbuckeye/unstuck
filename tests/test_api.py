@@ -392,6 +392,147 @@ def test_token_with_wrong_secret_returns_401():
     assert resp.status_code == 401
 
 
+# -- auth required on all protected endpoints --
+
+def test_sprints_require_auth():
+    resp = client.post('/api/sprints', json={'minutes': 10})
+    assert resp.status_code == 401
+
+
+def test_sprint_complete_requires_auth():
+    resp = client.post('/api/sprints/1/complete')
+    assert resp.status_code == 401
+
+
+def test_checkins_require_auth():
+    resp = client.post('/api/checkins', json={'energy': 'low', 'mood': 'steady', 'clarity': 'clear', 'resistance': 'low'})
+    assert resp.status_code == 401
+
+
+def test_unstuck_requires_auth():
+    resp = client.post('/api/unstuck', json={'avoiding': 'thing', 'blocker': 'fear', 'feeling': 'anxious'})
+    assert resp.status_code == 401
+
+
+# -- additional validation --
+
+def test_checkin_rejects_invalid_mood():
+    token, uid = signup_and_login()
+    resp = client.post(
+        '/api/checkins',
+        json={'energy': 'low', 'mood': 'ecstatic', 'clarity': 'clear', 'resistance': 'low'},
+        headers=auth_header(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_checkin_rejects_invalid_clarity():
+    token, uid = signup_and_login()
+    resp = client.post(
+        '/api/checkins',
+        json={'energy': 'low', 'mood': 'steady', 'clarity': 'blurry', 'resistance': 'low'},
+        headers=auth_header(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_checkin_rejects_invalid_resistance():
+    token, uid = signup_and_login()
+    resp = client.post(
+        '/api/checkins',
+        json={'energy': 'low', 'mood': 'steady', 'clarity': 'clear', 'resistance': 'extreme'},
+        headers=auth_header(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_unstuck_rejects_blank_avoiding():
+    token, uid = signup_and_login()
+    resp = client.post(
+        '/api/unstuck',
+        json={'avoiding': '', 'blocker': 'fear', 'feeling': 'anxious'},
+        headers=auth_header(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_unstuck_rejects_blank_feeling():
+    token, uid = signup_and_login()
+    resp = client.post(
+        '/api/unstuck',
+        json={'avoiding': 'thing', 'blocker': 'fear', 'feeling': ''},
+        headers=auth_header(token),
+    )
+    assert resp.status_code == 422
+
+
+# -- blocker-specific next_step values --
+
+def test_each_blocker_returns_correct_next_step():
+    """Each blocker type should map to a specific intervention."""
+    token, uid = signup_and_login()
+    expected = {
+        'overwhelm': 'Reduce the task to a 5 minute visible action',
+        'ambiguity': 'Write down the first concrete action',
+        'perfectionism': 'Create a messy first version',
+        'fear': 'Do the smallest safe move',
+        'boredom': 'Start with the easiest meaningful fragment',
+        'low_energy': 'Choose a lighter version of the task',
+    }
+    for blocker, expected_step in expected.items():
+        resp = client.post(
+            '/api/unstuck',
+            json={'avoiding': f'Task for {blocker}', 'blocker': blocker, 'feeling': 'anxious'},
+            headers=auth_header(token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()['next_step'] == expected_step, f'Wrong next_step for {blocker}'
+
+
+# -- optional fields --
+
+def test_create_task_without_category():
+    token, uid = signup_and_login()
+    resp = client.post('/api/tasks', json={'title': 'No category task'}, headers=auth_header(token))
+    assert resp.status_code == 201
+    assert resp.json()['category'] is None
+
+
+def test_create_sprint_without_task_title():
+    token, uid = signup_and_login()
+    resp = client.post('/api/sprints', json={'minutes': 15}, headers=auth_header(token))
+    assert resp.status_code == 201
+    assert resp.json()['task_title'] is None
+
+
+# -- login response structure --
+
+def test_login_response_includes_token_and_user_id():
+    client.post('/api/auth/signup', json={'email': 'struct@example.com', 'password': 'secret123'})
+    resp = client.post('/api/auth/login', json={'email': 'struct@example.com', 'password': 'secret123'})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert 'token' in body
+    assert 'user_id' in body
+    assert isinstance(body['user_id'], int)
+    assert body['token'].count('.') == 2  # valid JWT structure
+    assert 'password' not in body
+    assert 'password_hash' not in body
+
+
+# -- session safety: operations succeed even after prior errors --
+
+def test_404_does_not_break_subsequent_requests():
+    """After a 404, subsequent requests should still work (no leaked sessions)."""
+    token, uid = signup_and_login()
+    # trigger a 404
+    resp = client.post('/api/tasks/99999/complete', headers=auth_header(token))
+    assert resp.status_code == 404
+    # subsequent request should succeed
+    resp = client.post('/api/tasks', json={'title': 'After 404'}, headers=auth_header(token))
+    assert resp.status_code == 201
+
+
 # -- migration consistency --
 
 def test_alembic_models_match_migration():

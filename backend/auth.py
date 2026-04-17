@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from backend.db import User, get_session
+from backend.db import User, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def create_access_token(user_id: int, email: str) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> User:
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme), session=Depends(get_db)) -> User:
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -44,9 +44,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
     except (JWTError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid token')
 
-    session = get_session()
     user = session.query(User).filter(User.id == user_id).first()
-    session.close()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='User not found')
     return user

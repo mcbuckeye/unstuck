@@ -4,11 +4,14 @@ Use this checklist before each production deployment.
 
 ## 1. Tests
 
-- [ ] All backend tests pass: `PYTHONPATH=. pytest tests/test_api.py -v`
+- [ ] All 48 backend tests pass: `PYTHONPATH=. pytest tests/test_api.py -v`
 - [ ] Full user journey test passes (signup → checkin → tasks → stuck → sprint → complete)
 - [ ] Multi-user isolation test passes (no cross-user data leakage)
 - [ ] Expired/tampered token tests pass
 - [ ] Migration consistency test passes (ORM models match DB schema)
+- [ ] All protected endpoints reject unauthenticated requests (sprints, checkins, unstuck)
+- [ ] All validation edge cases covered (invalid mood, clarity, resistance, blank fields)
+- [ ] Blocker-specific next_step mapping verified for all 6 blocker types
 
 ## 2. Configuration & Environment
 
@@ -35,6 +38,7 @@ Use this checklist before each production deployment.
 ## 5. Docker & Deployment
 
 - [ ] Backend Dockerfile builds cleanly: `docker build -f Dockerfile .`
+- [ ] Backend Dockerfile runs `alembic upgrade head` before starting uvicorn
 - [ ] Frontend Dockerfile builds production assets (not dev server)
 - [ ] `docker-compose.yml` requires `JWT_SECRET` env var
 - [ ] Health endpoint responds: `GET /api/health`
@@ -45,6 +49,7 @@ Use this checklist before each production deployment.
 - [ ] Empty states show helpful hints (tasks, interventions)
 - [ ] Auth flow works end-to-end (signup → auto-login → dashboard)
 - [ ] 401 responses clear token and redirect to login
+- [ ] `vite.config.js` proxies `/api` to backend in dev mode
 
 ## Status
 

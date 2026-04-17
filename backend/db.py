@@ -81,4 +81,14 @@ def drop_db():
 
 
 def get_session():
+    """Return a new session. Caller is responsible for closing it."""
     return SessionLocal()
+
+
+def get_db():
+    """FastAPI dependency that yields a session and ensures cleanup."""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()

@@ -32,16 +32,17 @@ PYTHONPATH=. pytest tests/test_api.py
 ## Current MVP status
 
 Implemented locally:
-- signup and login with JWT auth
-- today screen
-- task add + complete
-- unstuck intervention flow
-- sprint start + complete
-- daily check-ins
-- basic stats
-- SQLAlchemy-backed persistence
+- Signup and login with JWT auth
+- Today screen (dashboard with main focus, energy, wins, active sprint)
+- Task add + complete
+- Unstuck intervention flow (6 blocker types with specific guidance)
+- Sprint start + complete (5/10/25 min)
+- Daily check-ins (energy, mood, clarity, resistance)
+- Stats dashboard (completed tasks, recovered stuck moments)
+- SQLAlchemy-backed persistence with session-safe dependency injection
 - CORS configured for unstuckinator.com
-- Alembic database migrations
+- Alembic database migrations (auto-run on Docker startup)
+- 48 backend tests covering auth, validation, isolation, edge cases, and e2e journeys
 
 ## Environment Variables
 
