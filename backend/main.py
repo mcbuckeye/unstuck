@@ -20,6 +20,7 @@ app.add_middleware(
     allow_origins=[
         'https://unstuckinator.com',
         'https://www.unstuckinator.com',
+        'https://unstuckinator.machomelab.com',
         'http://localhost:3000',
         'http://localhost:3060',
     ],

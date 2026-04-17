@@ -10,6 +10,13 @@ services:
       - DATABASE_URL=${DATABASE_URL:-sqlite:///./unstuck.db}
       - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET before starting}
       - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-1440}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.unstuckinator-api.rule=Host(`${DEPLOY_HOST:-unstuckinator.machomelab.com}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.unstuckinator-api.entrypoints=web,websecure"
+      - "traefik.http.routers.unstuckinator-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.unstuckinator-api.priority=20"
+      - "traefik.http.services.unstuckinator-api.loadbalancer.server.port=8000"
     networks:
       - dokploy-network
 
@@ -22,6 +29,13 @@ services:
       - "3060:3000"
     depends_on:
       - unstuckinator-backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.unstuckinator-web.rule=Host(`${DEPLOY_HOST:-unstuckinator.machomelab.com}`)"
+      - "traefik.http.routers.unstuckinator-web.entrypoints=web,websecure"
+      - "traefik.http.routers.unstuckinator-web.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.unstuckinator-web.priority=10"
+      - "traefik.http.services.unstuckinator-web.loadbalancer.server.port=3000"
     networks:
       - dokploy-network
 

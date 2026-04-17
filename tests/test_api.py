@@ -543,3 +543,44 @@ def test_alembic_models_match_migration():
     db_tables = set(inspector.get_table_names())
     model_tables = set(Base.metadata.tables.keys())
     assert model_tables.issubset(db_tables), f'Missing tables: {model_tables - db_tables}'
+
+
+# -- deployment config validation --
+
+def test_cors_includes_deploy_hostname():
+    """CORS origins must include the production deploy hostname."""
+    from backend.main import app
+    cors_mw = next(
+        (m for m in app.user_middleware if m.cls.__name__ == 'CORSMiddleware'),
+        None,
+    )
+    assert cors_mw is not None, 'CORSMiddleware not found'
+    origins = cors_mw.kwargs.get('allow_origins', [])
+    assert 'https://unstuckinator.machomelab.com' in origins, (
+        f'Deploy host missing from CORS origins: {origins}'
+    )
+
+
+def test_compose_has_traefik_labels():
+    """docker-compose.yml must define Traefik routing labels for both services."""
+    import yaml
+    with open('docker-compose.yml') as f:
+        compose = yaml.safe_load(f)
+    for svc_name in ('unstuckinator-backend', 'unstuckinator-frontend'):
+        svc = compose['services'][svc_name]
+        labels = svc.get('labels', [])
+        joined = '\n'.join(labels) if isinstance(labels, list) else str(labels)
+        assert 'traefik.enable=true' in joined, f'{svc_name} missing traefik.enable label'
+        assert 'traefik.http.routers.' in joined, f'{svc_name} missing traefik router label'
+        assert 'loadbalancer.server.port' in joined, f'{svc_name} missing loadbalancer port label'
+
+
+def test_compose_services_on_dokploy_network():
+    """Both services must be attached to the external dokploy-network."""
+    import yaml
+    with open('docker-compose.yml') as f:
+        compose = yaml.safe_load(f)
+    assert compose['networks']['dokploy-network']['external'] is True
+    for svc_name in ('unstuckinator-backend', 'unstuckinator-frontend'):
+        nets = compose['services'][svc_name].get('networks', [])
+        assert 'dokploy-network' in nets, f'{svc_name} not on dokploy-network'
