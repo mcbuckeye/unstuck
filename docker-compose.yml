@@ -1,5 +1,5 @@
 services:
-  unstuck-backend:
+  unstuckinator-backend:
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,7 +9,7 @@ services:
     networks:
       - dokploy-network
 
-  unstuck-frontend:
+  unstuckinator-frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -17,7 +17,7 @@ services:
     ports:
       - "3060:3000"
     depends_on:
-      - unstuck-backend
+      - unstuckinator-backend
     networks:
       - dokploy-network
 

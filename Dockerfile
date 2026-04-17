@@ -3,8 +3,11 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY pyproject.toml ./
+RUN pip install --no-cache-dir .
+
 COPY backend ./backend
-RUN pip install --no-cache-dir fastapi uvicorn[standard] pydantic
+COPY alembic ./alembic
+COPY alembic.ini ./
 
 EXPOSE 8000
 

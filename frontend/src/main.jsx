@@ -17,8 +17,8 @@ async function apiFetch(path, { token, method = 'GET', body } = {}) {
   if (body) opts.body = JSON.stringify(body)
   const res = await fetch(`${API}${path}`, opts)
   if (res.status === 401) {
-    localStorage.removeItem('unstuck_token')
-    localStorage.removeItem('unstuck_user')
+    localStorage.removeItem('unstuckinator_token')
+    localStorage.removeItem('unstuckinator_user')
     window.location.reload()
     return null
   }
@@ -64,13 +64,13 @@ function AuthGate({ onReady }) {
           return
         }
         const user = { id: loginData.user_id, email, token: loginData.token }
-        localStorage.setItem('unstuck_token', loginData.token)
-        localStorage.setItem('unstuck_user', JSON.stringify({ id: loginData.user_id, email }))
+        localStorage.setItem('unstuckinator_token', loginData.token)
+        localStorage.setItem('unstuckinator_user', JSON.stringify({ id: loginData.user_id, email }))
         onReady(user)
       } else {
         const user = { id: data.user_id, email, token: data.token }
-        localStorage.setItem('unstuck_token', data.token)
-        localStorage.setItem('unstuck_user', JSON.stringify({ id: data.user_id, email }))
+        localStorage.setItem('unstuckinator_token', data.token)
+        localStorage.setItem('unstuckinator_user', JSON.stringify({ id: data.user_id, email }))
         onReady(user)
       }
     } catch {
@@ -100,8 +100,8 @@ function AuthGate({ onReady }) {
 
 function App() {
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem('unstuck_token')
-    const stored = localStorage.getItem('unstuck_user')
+    const token = localStorage.getItem('unstuckinator_token')
+    const stored = localStorage.getItem('unstuckinator_user')
     if (token && stored) {
       try {
         const parsed = JSON.parse(stored)
@@ -120,8 +120,8 @@ function App() {
   const [error, setError] = useState('')
 
   function logout() {
-    localStorage.removeItem('unstuck_token')
-    localStorage.removeItem('unstuck_user')
+    localStorage.removeItem('unstuckinator_token')
+    localStorage.removeItem('unstuckinator_user')
     setUser(null)
     setToday({ tasks: [], wins: [], interventions: [] })
   }
@@ -210,8 +210,8 @@ function App() {
     return (
       <main className="app-shell">
         <header>
-          <h1>Unstuck</h1>
-          <p className="sub">A mobile-first focus coach for getting started.</p>
+          <h1>Unstuckinator</h1>
+          <p className="sub">A mobile-first focus coach for getting unstuck and started.</p>
         </header>
         <AuthGate onReady={setUser} />
       </main>
@@ -221,7 +221,7 @@ function App() {
   return (
     <main className="app-shell">
       <header>
-        <h1>Unstuck</h1>
+        <h1>Unstuckinator</h1>
         <div className="header-row">
           <p className="sub">Welcome back, {user.email}</p>
           <button className="ghost small" onClick={logout}>Log out</button>

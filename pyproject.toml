@@ -1,7 +1,7 @@
 [project]
-name = "unstuck-backend"
+name = "unstuckinator-backend"
 version = "0.1.0"
-description = "Unstuck backend"
+description = "Unstuckinator backend"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115.0",

@@ -1,10 +1,12 @@
-# Unstuck — Product Requirements Document
+# Unstuckinator — Product Requirements Document
 
 ## Product Overview
 
-**Unstuck** is a mobile-first web app that helps users reduce procrastination and develop focus by guiding them through short, psychologically-informed interventions when they feel blocked.
+**Unstuckinator** is a mobile-first web app that helps users reduce procrastination and develop focus by guiding them through short, psychologically-informed interventions when they feel blocked.
 
-The core promise is simple: when a user is avoiding something, Unstuck helps them quickly identify why, reduce resistance, define the smallest next step, and start moving.
+The core promise is simple: when a user is avoiding something, Unstuckinator helps them quickly identify why, reduce resistance, define the smallest next step, and start moving.
+
+**Website:** [unstuckinator.com](https://unstuckinator.com)
 
 ## Problem
 
@@ -12,7 +14,7 @@ People often know what they should do but still fail to start. The gap is rarely
 
 ## Solution
 
-Unstuck combines:
+Unstuckinator combines:
 - quick daily planning
 - guided “I’m stuck” interventions
 - task breakdown tools
@@ -163,5 +165,5 @@ Guided micro-coaching flow:
 
 ## Product Positioning
 
-Unstuck is not just a task manager.
+Unstuckinator is not just a task manager.
 It is an execution support system for people who need help getting moving when resistance shows up.

@@ -1,6 +1,8 @@
-# Unstuck
+# Unstuckinator
 
 Mobile-first focus coaching web app for reducing procrastination and helping users start when they feel stuck.
+
+**Website:** [unstuckinator.com](https://unstuckinator.com)
 
 ## Documents
 
@@ -29,7 +31,7 @@ PYTHONPATH=. pytest tests/test_api.py
 ## Current MVP status
 
 Implemented locally:
-- signup and login shell
+- signup and login with JWT auth
 - today screen
 - task add + complete
 - unstuck intervention flow
@@ -37,6 +39,8 @@ Implemented locally:
 - daily check-ins
 - basic stats
 - SQLAlchemy-backed persistence
+- CORS configured for unstuckinator.com
+- Alembic database migrations
 
 ## Deployment
 
@@ -45,4 +49,4 @@ The repo includes:
 - `Dockerfile.frontend`
 - `docker-compose.yml`
 
-Designed for deployment via GitHub + Dokploy, but not deployed in this phase.
+Designed for deployment via GitHub + Dokploy to unstuckinator.com, but not deployed in this phase.

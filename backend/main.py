@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 
 from backend.auth import (
@@ -12,7 +13,21 @@ from backend.auth import (
 )
 from backend.db import Checkin, Intervention, Sprint, Task, User, drop_db, get_session, init_db
 
-app = FastAPI(title='Unstuck API')
+app = FastAPI(title='Unstuckinator API')
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        'https://unstuckinator.com',
+        'https://www.unstuckinator.com',
+        'http://localhost:3000',
+        'http://localhost:3060',
+    ],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
+
 init_db()
 
 
@@ -71,7 +86,7 @@ class CheckinCreate(BaseModel):
 
 @app.get('/api/health')
 def healthcheck():
-    return {'status': 'ok'}
+    return {'status': 'ok', 'name': 'Unstuckinator API'}
 
 
 @app.post('/api/auth/signup', status_code=status.HTTP_201_CREATED)

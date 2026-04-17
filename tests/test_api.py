@@ -31,7 +31,7 @@ def auth_header(token):
 def test_healthcheck():
     response = client.get('/api/health')
     assert response.status_code == 200
-    assert response.json() == {'status': 'ok'}
+    assert response.json()['status'] == 'ok'
 
 
 # -- auth: signup and login --
@@ -213,3 +213,88 @@ def test_checkin_rejects_invalid_energy():
         headers=auth_header(token),
     )
     assert resp.status_code == 422
+
+
+# -- CORS --
+
+def test_cors_allows_unstuckinator_origin():
+    resp = client.options(
+        '/api/health',
+        headers={'Origin': 'https://unstuckinator.com', 'Access-Control-Request-Method': 'GET'},
+    )
+    assert resp.headers.get('access-control-allow-origin') in (
+        'https://unstuckinator.com', '*',
+    )
+
+
+# -- idempotency / edge cases --
+
+def test_complete_already_completed_task_stays_done():
+    token, uid = signup_and_login()
+    created = client.post('/api/tasks', json={'title': 'Ship it'}, headers=auth_header(token))
+    task_id = created.json()['id']
+    client.post(f'/api/tasks/{task_id}/complete', headers=auth_header(token))
+    second = client.post(f'/api/tasks/{task_id}/complete', headers=auth_header(token))
+    assert second.status_code == 200
+    assert second.json()['done'] is True
+
+
+def test_complete_sprint_404_for_wrong_user():
+    token_a, _ = signup_and_login('a@example.com', 'pass1234')
+    token_b, _ = signup_and_login('b@example.com', 'pass1234')
+    created = client.post('/api/sprints', json={'minutes': 10}, headers=auth_header(token_a))
+    sprint_id = created.json()['id']
+    resp = client.post(f'/api/sprints/{sprint_id}/complete', headers=auth_header(token_b))
+    assert resp.status_code == 404
+
+
+def test_sprint_rejects_over_max_minutes():
+    token, uid = signup_and_login()
+    resp = client.post('/api/sprints', json={'minutes': 999}, headers=auth_header(token))
+    assert resp.status_code == 422
+
+
+def test_today_shows_completed_tasks_in_wins():
+    token, uid = signup_and_login()
+    created = client.post('/api/tasks', json={'title': 'Win task'}, headers=auth_header(token))
+    task_id = created.json()['id']
+    client.post(f'/api/tasks/{task_id}/complete', headers=auth_header(token))
+    today = client.get('/api/today', headers=auth_header(token)).json()
+    assert 'Win task' in today['wins']
+    # completed tasks should not appear in open task list
+    assert all(t['title'] != 'Win task' for t in today['tasks'])
+
+
+def test_unstuck_reframe_contains_feeling():
+    token, uid = signup_and_login()
+    resp = client.post(
+        '/api/unstuck',
+        json={'avoiding': 'Taxes', 'blocker': 'fear', 'feeling': 'terrified'},
+        headers=auth_header(token),
+    )
+    payload = resp.json()
+    assert 'terrified' in payload['reframe']
+
+
+def test_signup_does_not_leak_password_hash():
+    resp = client.post('/api/auth/signup', json={'email': 'safe@example.com', 'password': 'secret123'})
+    body = resp.json()
+    assert 'password_hash' not in body
+    assert 'password' not in body
+
+
+def test_healthcheck_returns_app_name():
+    resp = client.get('/api/health')
+    body = resp.json()
+    assert body['status'] == 'ok'
+    assert 'name' in body
+    assert 'Unstuckinator' in body['name']
+
+
+def test_multiple_checkins_latest_wins():
+    token, uid = signup_and_login()
+    client.post('/api/checkins', json={'energy': 'low', 'mood': 'anxious', 'clarity': 'foggy', 'resistance': 'high'}, headers=auth_header(token))
+    client.post('/api/checkins', json={'energy': 'high', 'mood': 'hopeful', 'clarity': 'clear', 'resistance': 'low'}, headers=auth_header(token))
+    today = client.get('/api/today', headers=auth_header(token)).json()
+    assert today['energy'] == 'high'
+    assert today['latest_checkin']['mood'] == 'hopeful'

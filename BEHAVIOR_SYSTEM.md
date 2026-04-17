@@ -1,8 +1,8 @@
-# Unstuck — Behavior System Spec
+# Unstuckinator — Behavior System Spec
 
 ## Purpose
 
-This document defines the psychological model and intervention logic that powers Unstuck.
+This document defines the psychological model and intervention logic that powers Unstuckinator.
 
 The goal is to help a user move from avoidance to action as quickly and reliably as possible.
 
@@ -20,7 +20,7 @@ Users usually do not fail because they lack desire. They fail because of one or 
 - low energy
 - emotional discomfort
 
-Unstuck should identify the state, reduce friction, and guide the user into immediate action.
+Unstuckinator should identify the state, reduce friction, and guide the user into immediate action.
 
 ## Main Intervention Loop
 
@@ -206,7 +206,7 @@ Per day:
 
 ## Insight Logic
 
-Unstuck should identify patterns such as:
+Unstuckinator should identify patterns such as:
 - specific times of day with highest resistance
 - blocker types that occur most often
 - interventions that most reliably lead to action
