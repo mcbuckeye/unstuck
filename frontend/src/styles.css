@@ -61,6 +61,12 @@ button {
   margin-top: 12px;
 }
 
+button.ghost {
+  background: transparent;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
 input,
 select,
 textarea {

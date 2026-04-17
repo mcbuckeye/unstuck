@@ -4,20 +4,58 @@ import './styles.css'
 
 const API = '/api'
 
+function AuthGate({ onReady }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [mode, setMode] = useState('signup')
+
+  async function submit(e) {
+    e.preventDefault()
+    const endpoint = mode === 'signup' ? '/auth/signup' : '/auth/login'
+    const res = await fetch(`${API}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+    if (mode === 'signup') {
+      onReady({ id: data.id, email })
+    } else {
+      onReady({ id: data.user_id, email })
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>{mode === 'signup' ? 'Create your account' : 'Log in'}</h2>
+      <form onSubmit={submit} className="stack">
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
+        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" />
+        <button type="submit">{mode === 'signup' ? 'Sign up' : 'Log in'}</button>
+      </form>
+      <button className="ghost" onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}>
+        Switch to {mode === 'signup' ? 'log in' : 'sign up'}
+      </button>
+    </section>
+  )
+}
+
 function App() {
-  const [today, setToday] = useState({ tasks: [], wins: [] })
+  const [user, setUser] = useState(null)
+  const [today, setToday] = useState({ tasks: [], wins: [], interventions: [] })
   const [taskTitle, setTaskTitle] = useState('')
   const [stuckForm, setStuckForm] = useState({ avoiding: '', blocker: 'overwhelm', feeling: 'anxious' })
   const [unstuckResult, setUnstuckResult] = useState(null)
 
-  async function loadToday() {
-    const res = await fetch(`${API}/today`)
+  async function loadToday(activeUser = user) {
+    if (!activeUser) return
+    const res = await fetch(`${API}/today?user_id=${activeUser.id}`)
     setToday(await res.json())
   }
 
   useEffect(() => {
     loadToday()
-  }, [])
+  }, [user])
 
   async function createTask(e) {
     e.preventDefault()
@@ -25,7 +63,7 @@ function App() {
     await fetch(`${API}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: taskTitle, category: 'focus' }),
+      body: JSON.stringify({ user_id: user.id, title: taskTitle, category: 'focus' }),
     })
     setTaskTitle('')
     loadToday()
@@ -36,26 +74,39 @@ function App() {
     const res = await fetch(`${API}/unstuck`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(stuckForm),
+      body: JSON.stringify({ ...stuckForm, user_id: user.id }),
     })
     const data = await res.json()
     setUnstuckResult(data)
+    loadToday()
   }
 
   async function startSprint(minutes) {
     await fetch(`${API}/sprints`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ minutes, task_title: today.main_focus }),
+      body: JSON.stringify({ user_id: user.id, minutes, task_title: today.main_focus }),
     })
     loadToday()
+  }
+
+  if (!user) {
+    return (
+      <main className="app-shell">
+        <header>
+          <h1>Unstuck</h1>
+          <p className="sub">A mobile-first focus coach for getting started.</p>
+        </header>
+        <AuthGate onReady={setUser} />
+      </main>
+    )
   }
 
   return (
     <main className="app-shell">
       <header>
         <h1>Unstuck</h1>
-        <p className="sub">A mobile-first focus coach for getting started.</p>
+        <p className="sub">Welcome back, {user.email}</p>
       </header>
 
       <section className="card primary">
@@ -111,6 +162,15 @@ function App() {
             </button>
           </div>
         )}
+      </section>
+
+      <section className="card">
+        <h2>Recent interventions</h2>
+        <ul className="task-list">
+          {today.interventions.map((item) => (
+            <li key={item.id}>{item.avoiding} → {item.next_step}</li>
+          ))}
+        </ul>
       </section>
 
       <section className="card">
