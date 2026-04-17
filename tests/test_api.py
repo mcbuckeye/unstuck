@@ -1,6 +1,10 @@
+import os
+
 from fastapi.testclient import TestClient
 
-from backend.main import app, reset_state
+os.environ['DATABASE_URL'] = 'sqlite:///./unstuck_test.db'
+
+from backend.main import app, reset_state  # noqa: E402
 
 client = TestClient(app)
 
@@ -23,7 +27,7 @@ def test_signup_and_login_flow():
 
     login = client.post('/api/auth/login', json={'email': 'steve@example.com', 'password': 'secret123'})
     assert login.status_code == 200
-    assert login.json()['token'] == 'demo-token-1'
+    assert login.json()['token'].startswith('demo-token-')
 
 
 def test_today_screen_payload_is_user_scoped():

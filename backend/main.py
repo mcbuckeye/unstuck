@@ -1,21 +1,15 @@
 from fastapi import FastAPI, HTTPException, Query, status
 from pydantic import BaseModel
 
-app = FastAPI(title='Unstuck API')
+from backend.db import Checkin, Intervention, Sprint, Task, User, drop_db, get_session, init_db
 
-USERS = []
-TASKS = []
-SPRINTS = []
-INTERVENTIONS = []
-CHECKINS = []
+app = FastAPI(title='Unstuck API')
+init_db()
 
 
 def reset_state():
-    USERS.clear()
-    TASKS.clear()
-    SPRINTS.clear()
-    INTERVENTIONS.clear()
-    CHECKINS.clear()
+    drop_db()
+    init_db()
 
 
 class SignupRequest(BaseModel):
@@ -66,99 +60,113 @@ def healthcheck():
 
 @app.post('/api/auth/signup', status_code=status.HTTP_201_CREATED)
 def signup(request: SignupRequest):
-    if any(user['email'] == request.email for user in USERS):
+    session = get_session()
+    existing = session.query(User).filter(User.email == request.email).first()
+    if existing:
+        session.close()
         raise HTTPException(status_code=400, detail='User already exists')
 
-    user = {
-        'id': len(USERS) + 1,
-        'email': request.email,
-        'password': request.password,
-    }
-    USERS.append(user)
-    return {'id': user['id'], 'email': user['email']}
+    user = User(email=request.email, password=request.password)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    session.close()
+    return {'id': user.id, 'email': user.email}
 
 
 @app.post('/api/auth/login')
 def login(request: LoginRequest):
-    user = next((user for user in USERS if user['email'] == request.email and user['password'] == request.password), None)
+    session = get_session()
+    user = session.query(User).filter(User.email == request.email, User.password == request.password).first()
+    session.close()
     if not user:
         raise HTTPException(status_code=401, detail='Invalid credentials')
-    return {'token': f"demo-token-{user['id']}", 'user_id': user['id']}
+    return {'token': f'demo-token-{user.id}', 'user_id': user.id}
 
 
 @app.get('/api/today')
 def today(user_id: int = Query(...)):
-    open_tasks = [task for task in TASKS if task['user_id'] == user_id and not task['done']]
-    interventions = [item for item in INTERVENTIONS if item['user_id'] == user_id]
-    active_sprint = next((s for s in reversed(SPRINTS) if s['user_id'] == user_id and s['status'] == 'active'), None)
-    latest_checkin = next((c for c in reversed(CHECKINS) if c['user_id'] == user_id), None)
-    return {
-        'main_focus': open_tasks[0]['title'] if open_tasks else 'Start the most avoided meaningful task',
-        'tasks': open_tasks,
-        'energy': latest_checkin['energy'] if latest_checkin else 'unknown',
-        'wins': [task['title'] for task in TASKS if task['user_id'] == user_id and task['done']],
-        'active_sprint': active_sprint,
-        'interventions': interventions,
-        'latest_checkin': latest_checkin,
+    session = get_session()
+    open_tasks = session.query(Task).filter(Task.user_id == user_id, Task.done.is_(False)).all()
+    interventions = session.query(Intervention).filter(Intervention.user_id == user_id).all()
+    active_sprint = session.query(Sprint).filter(Sprint.user_id == user_id, Sprint.status == 'active').order_by(Sprint.id.desc()).first()
+    latest_checkin = session.query(Checkin).filter(Checkin.user_id == user_id).order_by(Checkin.id.desc()).first()
+    wins = session.query(Task).filter(Task.user_id == user_id, Task.done.is_(True)).all()
+    payload = {
+        'main_focus': open_tasks[0].title if open_tasks else 'Start the most avoided meaningful task',
+        'tasks': [{'id': t.id, 'title': t.title, 'category': t.category, 'done': t.done} for t in open_tasks],
+        'energy': latest_checkin.energy if latest_checkin else 'unknown',
+        'wins': [task.title for task in wins],
+        'active_sprint': None if not active_sprint else {'id': active_sprint.id, 'minutes': active_sprint.minutes, 'task_title': active_sprint.task_title, 'status': active_sprint.status},
+        'interventions': [{'id': i.id, 'avoiding': i.avoiding, 'blocker': i.blocker, 'feeling': i.feeling, 'next_step': i.next_step} for i in interventions],
+        'latest_checkin': None if not latest_checkin else {'id': latest_checkin.id, 'energy': latest_checkin.energy, 'mood': latest_checkin.mood, 'clarity': latest_checkin.clarity, 'resistance': latest_checkin.resistance},
     }
+    session.close()
+    return payload
 
 
 @app.post('/api/tasks', status_code=status.HTTP_201_CREATED)
 def create_task(task: TaskCreate):
-    payload = {
-        'id': len(TASKS) + 1,
-        'user_id': task.user_id,
-        'title': task.title,
-        'category': task.category,
-        'done': False,
-    }
-    TASKS.append(payload)
-    return payload
+    session = get_session()
+    payload = Task(user_id=task.user_id, title=task.title, category=task.category, done=False)
+    session.add(payload)
+    session.commit()
+    session.refresh(payload)
+    response = {'id': payload.id, 'user_id': payload.user_id, 'title': payload.title, 'category': payload.category, 'done': payload.done}
+    session.close()
+    return response
 
 
 @app.post('/api/tasks/{task_id}/complete')
 def complete_task(task_id: int, request: UserRef):
-    task = next((task for task in TASKS if task['id'] == task_id and task['user_id'] == request.user_id), None)
+    session = get_session()
+    task = session.query(Task).filter(Task.id == task_id, Task.user_id == request.user_id).first()
     if not task:
+        session.close()
         raise HTTPException(status_code=404, detail='Task not found')
-    task['done'] = True
-    return task
+    task.done = True
+    session.commit()
+    response = {'id': task.id, 'user_id': task.user_id, 'title': task.title, 'category': task.category, 'done': task.done}
+    session.close()
+    return response
 
 
 @app.post('/api/sprints', status_code=status.HTTP_201_CREATED)
 def create_sprint(sprint: SprintCreate):
-    payload = {
-        'id': len(SPRINTS) + 1,
-        'user_id': sprint.user_id,
-        'minutes': sprint.minutes,
-        'task_title': sprint.task_title,
-        'status': 'active',
-    }
-    SPRINTS.append(payload)
-    return payload
+    session = get_session()
+    payload = Sprint(user_id=sprint.user_id, minutes=sprint.minutes, task_title=sprint.task_title, status='active')
+    session.add(payload)
+    session.commit()
+    session.refresh(payload)
+    response = {'id': payload.id, 'user_id': payload.user_id, 'minutes': payload.minutes, 'task_title': payload.task_title, 'status': payload.status}
+    session.close()
+    return response
 
 
 @app.post('/api/sprints/{sprint_id}/complete')
 def complete_sprint(sprint_id: int, request: UserRef):
-    sprint = next((s for s in SPRINTS if s['id'] == sprint_id and s['user_id'] == request.user_id), None)
+    session = get_session()
+    sprint = session.query(Sprint).filter(Sprint.id == sprint_id, Sprint.user_id == request.user_id).first()
     if not sprint:
+        session.close()
         raise HTTPException(status_code=404, detail='Sprint not found')
-    sprint['status'] = 'completed'
-    return sprint
+    sprint.status = 'completed'
+    session.commit()
+    response = {'id': sprint.id, 'user_id': sprint.user_id, 'minutes': sprint.minutes, 'task_title': sprint.task_title, 'status': sprint.status}
+    session.close()
+    return response
 
 
 @app.post('/api/checkins', status_code=status.HTTP_201_CREATED)
 def create_checkin(checkin: CheckinCreate):
-    payload = {
-        'id': len(CHECKINS) + 1,
-        'user_id': checkin.user_id,
-        'energy': checkin.energy,
-        'mood': checkin.mood,
-        'clarity': checkin.clarity,
-        'resistance': checkin.resistance,
-    }
-    CHECKINS.append(payload)
-    return payload
+    session = get_session()
+    payload = Checkin(user_id=checkin.user_id, energy=checkin.energy, mood=checkin.mood, clarity=checkin.clarity, resistance=checkin.resistance)
+    session.add(payload)
+    session.commit()
+    session.refresh(payload)
+    response = {'id': payload.id, 'user_id': payload.user_id, 'energy': payload.energy, 'mood': payload.mood, 'clarity': payload.clarity, 'resistance': payload.resistance}
+    session.close()
+    return response
 
 
 @app.post('/api/unstuck')
@@ -172,15 +180,11 @@ def unstuck_flow(request: UnstuckRequest):
         'low_energy': 'Choose a lighter version of the task',
     }
     next_step = next_step_map.get(request.blocker, 'Do the smallest next step you can do now')
-    record = {
-        'id': len(INTERVENTIONS) + 1,
-        'user_id': request.user_id,
-        'avoiding': request.avoiding,
-        'blocker': request.blocker,
-        'feeling': request.feeling,
-        'next_step': next_step,
-    }
-    INTERVENTIONS.append(record)
+    session = get_session()
+    record = Intervention(user_id=request.user_id, avoiding=request.avoiding, blocker=request.blocker, feeling=request.feeling, next_step=next_step)
+    session.add(record)
+    session.commit()
+    session.close()
     return {
         'next_step': next_step,
         'suggested_sprint_minutes': 5,
