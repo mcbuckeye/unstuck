@@ -1,7 +1,7 @@
 import os
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String, create_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./unstuck.db')
 engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False} if DATABASE_URL.startswith('sqlite') else {})
@@ -17,7 +17,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
-    password: Mapped[str] = mapped_column(String)
+    password_hash: Mapped[str] = mapped_column(String)
 
 
 class Task(Base):
@@ -70,5 +70,5 @@ def drop_db():
     Base.metadata.drop_all(bind=engine)
 
 
-def get_session() -> Session:
+def get_session():
     return SessionLocal()

@@ -24,10 +24,17 @@ def test_signup_and_login_flow():
     assert signup.status_code == 201
     payload = signup.json()
     assert payload['email'] == 'steve@example.com'
+    assert payload['password_hash'] == '<hidden>'
 
     login = client.post('/api/auth/login', json={'email': 'steve@example.com', 'password': 'secret123'})
     assert login.status_code == 200
     assert login.json()['token'].startswith('demo-token-')
+
+
+def test_login_rejects_bad_password():
+    client.post('/api/auth/signup', json={'email': 'steve@example.com', 'password': 'secret123'})
+    login = client.post('/api/auth/login', json={'email': 'steve@example.com', 'password': 'wrong'})
+    assert login.status_code == 401
 
 
 def test_today_screen_payload_is_user_scoped():

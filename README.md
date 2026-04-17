@@ -26,6 +26,18 @@ npm run dev
 PYTHONPATH=. pytest tests/test_api.py
 ```
 
+## Current MVP status
+
+Implemented locally:
+- signup and login shell
+- today screen
+- task add + complete
+- unstuck intervention flow
+- sprint start + complete
+- daily check-ins
+- basic stats
+- SQLAlchemy-backed persistence
+
 ## Deployment
 
 The repo includes:
@@ -33,4 +45,4 @@ The repo includes:
 - `Dockerfile.frontend`
 - `docker-compose.yml`
 
-Designed for deployment via GitHub + Dokploy.
+Designed for deployment via GitHub + Dokploy, but not deployed in this phase.

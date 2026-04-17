@@ -1,10 +1,12 @@
 from fastapi import FastAPI, HTTPException, Query, status
+from passlib.context import CryptContext
 from pydantic import BaseModel
 
 from backend.db import Checkin, Intervention, Sprint, Task, User, drop_db, get_session, init_db
 
 app = FastAPI(title='Unstuck API')
 init_db()
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 
 def reset_state():
@@ -66,20 +68,20 @@ def signup(request: SignupRequest):
         session.close()
         raise HTTPException(status_code=400, detail='User already exists')
 
-    user = User(email=request.email, password=request.password)
+    user = User(email=request.email, password_hash=pwd_context.hash(request.password))
     session.add(user)
     session.commit()
     session.refresh(user)
     session.close()
-    return {'id': user.id, 'email': user.email}
+    return {'id': user.id, 'email': user.email, 'password_hash': '<hidden>'}
 
 
 @app.post('/api/auth/login')
 def login(request: LoginRequest):
     session = get_session()
-    user = session.query(User).filter(User.email == request.email, User.password == request.password).first()
+    user = session.query(User).filter(User.email == request.email).first()
     session.close()
-    if not user:
+    if not user or not pwd_context.verify(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail='Invalid credentials')
     return {'token': f'demo-token-{user.id}', 'user_id': user.id}
 
